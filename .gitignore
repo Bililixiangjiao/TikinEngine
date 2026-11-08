@@ -1,0 +1,41 @@
+﻿# ===== 编译产物 =====
+export/
+bin/
+out/
+build/
+*.exe
+*.dll
+*.swf
+*.o
+*.obj
+*.pch
+
+# ===== 备份文件 =====
+*.bak
+*.bak2
+*.bak3
+*.parsejson.bak
+*.orig
+
+# ===== 系统/编辑器 =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# ===== 密钥/敏感 =====
+.env
+*.pem
+*.key
+secrets.json
+
+# ===== 大资源（音频/图片/视频不进git，用 Release 发）=====
+*.ogg
+*.mp3
+*.wav
+*.png
+*.jpg
+*.jpeg
+*.psd
+*.fla
