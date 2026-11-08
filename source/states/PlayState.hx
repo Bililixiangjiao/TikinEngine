@@ -1126,7 +1126,7 @@ class PlayState extends MusicBeatState
 
 		var tempScore:String = 'Score: ${songScore}'
 		+ (!instakillOnMiss ? '| Misses: ${songMisses}' : "")
-		+ ' | Rating: ${str}                              |TikinEngine-v1.1.4';
+		+ ' | Rating: ${str}                              |TikinEngine-v1.1.5';
 		// "tempScore" variable is used to prevent another memory leak, just in case
 		// "\n" here prevents the text from being cut off by beat zooms
 		scoreTxt.text = '${tempScore}\n';
@@ -2416,6 +2416,9 @@ class PlayState extends MusicBeatState
 	public var comboGroup:FlxSpriteGroup;
 	// Stores HUD Objects in a Group
 	public var uiGroup:FlxSpriteGroup;
+	// 击打早晚提示（+晚 / -早）
+	public var hitOffsetText:FlxText;
+	private var hitOffsetTween:FlxTween;
 	// Stores Note Objects in a Group
 	public var noteGroup:FlxTypedGroup<FlxBasic>;
 
@@ -2481,9 +2484,38 @@ class PlayState extends MusicBeatState
 		return ratingsData[ratingsData.length - 1];
 	}
 
+	// 显示这一下打晚了还是打早了：+ 表示晚、- 表示早，单位秒
+	private function showHitOffset(rawDiffMs:Float):Void
+	{
+		if(hitOffsetText == null)
+		{
+			hitOffsetText = new FlxText(0, 0, FlxG.width, "", 28);
+			hitOffsetText.setFormat(Paths.font('simhei.ttf'), 28, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+			hitOffsetText.borderSize = 2.2;
+			hitOffsetText.scrollFactor.set();
+			add(hitOffsetText);
+			hitOffsetText.cameras = [camHUD];
+		}
+
+		var secs:Float = -rawDiffMs / 1000 / playbackRate; // 晚 = 正，早 = 负
+		var absSecs:Float = Math.abs(secs);
+		var shown:Float = Math.round(absSecs * 100) / 100;
+
+		hitOffsetText.text = (secs >= 0 ? '+' : '-') + shown + '秒';
+		hitOffsetText.color = secs >= 0 ? 0xFFFF7070 : 0xFF70C0FF; // 晚=红，早=蓝
+		hitOffsetText.y = FlxG.height * 0.62;
+		hitOffsetText.alpha = 1;
+		hitOffsetText.visible = true;
+
+		if(hitOffsetTween != null) hitOffsetTween.cancel();
+		hitOffsetTween = FlxTween.tween(hitOffsetText, {alpha: 0, y: hitOffsetText.y - 40}, 0.8, {ease: FlxEase.quadOut, startDelay: 0.1});
+	}
+
 	private function popUpScore(note:Note = null):Void
 	{
-		var noteDiff:Float = Math.abs(note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset);
+		var judgedDiff:Float = note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset;
+		var noteDiff:Float = Math.abs(judgedDiff);
+		showHitOffset(judgedDiff);
 		vocals.volume = 1;
 
 		if (!ClientPrefs.data.comboStacking && comboGroup.members.length > 0) {
