@@ -57,6 +57,7 @@ import psychlua.HScript;
 
 #if SScript
 import tea.SScript;
+import ReplayUtil;
 #end
 
 /**
@@ -201,10 +202,15 @@ class PlayState extends MusicBeatState
 
 	public var botplaySine:Float = 0;
 	public var botplayTxt:FlxText;
+	public var replayTxt:FlxText;
 
 	public var iconP1:HealthIcon;
 	public var iconP2:HealthIcon;
 	public var camHUD:FlxCamera;
+	public static var replayMode:Bool = false;
+	public static var replayData:Array<Dynamic> = null;
+	public static var replayFileName:String = null;
+	public var replayIndex:Int = 0;
 	public var camGame:FlxCamera;
 	public var camOther:FlxCamera;
 	public var cameraSpeed:Float = 1;
@@ -266,6 +272,18 @@ class PlayState extends MusicBeatState
 
 	override public function create()
 	{
+		if (replayMode)
+		{
+			replayData = ReplayUtil.load(SONG.song, PlayState.storyDifficulty, PlayState.replayFileName);
+			PlayState.replayFileName = null;
+			if (replayData == null) replayMode = false;
+			replayIndex = 0;
+		}
+		else
+		{
+			replayData = [];
+			replayIndex = 0;
+		}
 		//trace('Playback Rate: ' + playbackRate);
 		Paths.clearStoredMemory();
 
@@ -566,6 +584,14 @@ class PlayState extends MusicBeatState
 		uiGroup.add(botplayTxt);
 		if(ClientPrefs.data.downScroll)
 			botplayTxt.y = timeBar.y - 78;
+
+		// ===== REPLAY 文字（BOTPLAY 上方）=====
+		replayTxt = new FlxText(400, timeBar.y - 122, FlxG.width - 800, "REPLAY", 32);
+		replayTxt.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
+		replayTxt.scrollFactor.set();
+		replayTxt.borderSize = 1.25;
+		replayTxt.visible = false;
+		uiGroup.add(replayTxt);
 
 		uiGroup.cameras = [camHUD];
 		noteGroup.cameras = [camHUD];
@@ -1126,7 +1152,7 @@ class PlayState extends MusicBeatState
 
 		var tempScore:String = 'Score: ${songScore}'
 		+ (!instakillOnMiss ? '| Misses: ${songMisses}' : "")
-		+ ' | Rating: ${str}                              |TikinEngine-v1.1.5';
+		+ ' | Rating: ${str} |     |TikinEngine-v1.2.0 |song ${SONG.song}';
 		// "tempScore" variable is used to prevent another memory leak, just in case
 		// "\n" here prevents the text from being cut off by beat zooms
 		scoreTxt.text = '${tempScore}\n';
@@ -1641,11 +1667,37 @@ class PlayState extends MusicBeatState
 		callOnScripts('onUpdate', [elapsed]);
 
 		super.update(elapsed);
+		if (replayMode && replayData != null && replayData.length > 0)
+		{
+			while (replayIndex < replayData.length && Conductor.songPosition >= replayData[replayIndex].t)
+			{
+				var ev:Dynamic = replayData[replayIndex];
+				replayIndex++;
+				// Replay 命中：同一时间优先命中长键头部（非 sustain），并跳过已命中
+				var best:Note = null;
+				for (note in notes.members)
+				{
+					if (note == null || note.wasGoodHit) continue;
+					if (Math.abs(note.strumTime - ev.t) >= 0.5 || note.noteData != ev.d) continue;
+					if (best == null || (!note.isSustainNote && best.isSustainNote)) best = note;
+				}
+				if (best != null) goodNoteHit(best);
+			}
+		}
 
 		setOnScripts('curDecStep', curDecStep);
 		setOnScripts('curDecBeat', curDecBeat);
 
-		if(botplayTxt != null && botplayTxt.visible) {
+				
+		if (botplayTxt != null)
+		{
+			var _both:Bool = (replayMode && cpuControlled);
+			var _want:String = _both ? 'NO BOT PLAY' : 'BOTPLAY';
+			if (botplayTxt.text != _want) botplayTxt.text = _want;
+			botplayTxt.color = _both ? 0xFFFF5555 : 0xFFFFFFFF;
+		}
+		if (replayTxt != null) replayTxt.visible = replayMode;
+if(botplayTxt != null && botplayTxt.visible) {
 			botplaySine += 180 * elapsed;
 			botplayTxt.alpha = 1 - Math.sin((Math.PI * botplaySine) / 180);
 		}
@@ -1739,7 +1791,7 @@ class PlayState extends MusicBeatState
 		{
 			if(!inCutscene)
 			{
-				if(!cpuControlled)
+				if(!cpuControlled && !replayMode)
 					keysCheck();
 				else
 					playerDance();
@@ -2287,6 +2339,26 @@ class PlayState extends MusicBeatState
 	public var transitioning = false;
 	public function endSong()
 	{
+		trace('=== ENDSONG === data=' + (replayData == null ? 'null' : Std.string(replayData.length)) + ' decided=' + ReplaySaveSubstate.decided);
+		if (!ReplaySaveSubstate.decided && subState == null && !replayMode && !cpuControlled)
+		{
+			ReplaySaveSubstate.acc = ratingPercent;
+			ReplaySaveSubstate.misses = songMisses;
+			ReplaySaveSubstate.maxCombo = combo;
+			ReplaySaveSubstate.scr = songScore;
+			ReplaySaveSubstate.songName = SONG.song;
+			ReplaySaveSubstate.diff = PlayState.storyDifficulty;
+			openSubState(new ReplaySaveSubstate());
+			return false;
+		}
+		ReplaySaveSubstate.decided = false;
+
+		if (!replayMode && !cpuControlled && replayData != null && replayData.length > 0)
+			ReplayUtil.save(SONG.song, PlayState.storyDifficulty, replayData);
+
+		replayMode = false;
+		replayData = null;
+		replayIndex = 0;
 		//Should kill you if you tried to cheat
 		if(!startingSong) {
 			notes.forEach(function(daNote:Note) {
@@ -2686,7 +2758,7 @@ class PlayState extends MusicBeatState
 
 	private function keyPressed(key:Int)
 	{
-		if(cpuControlled || paused || inCutscene || key < 0 || key >= playerStrums.length || !generatedMusic || endingSong || boyfriend.stunned) return;
+		if(cpuControlled || replayMode || paused || inCutscene || key < 0 || key >= playerStrums.length || !generatedMusic || endingSong || boyfriend.stunned) return;
 
 		var ret:Dynamic = callOnScripts('onKeyPressPre', [key]);
 		if(ret == LuaUtils.Function_Stop) return;
@@ -2764,7 +2836,7 @@ class PlayState extends MusicBeatState
 
 	private function keyReleased(key:Int)
 	{
-		if(cpuControlled || !startedCountdown || paused || key < 0 || key >= playerStrums.length) return;
+		if(cpuControlled || replayMode || !startedCountdown || paused || key < 0 || key >= playerStrums.length) return;
 
 		var ret:Dynamic = callOnScripts('onKeyReleasePre', [key]);
 		if(ret == LuaUtils.Function_Stop) return;
@@ -2796,6 +2868,7 @@ class PlayState extends MusicBeatState
 	// Hold notes
 	private function keysCheck():Void
 	{
+		if (replayMode) return;
 		// HOLDING
 		var holdArray:Array<Bool> = [];
 		var pressArray:Array<Bool> = [];
@@ -2994,6 +3067,8 @@ class PlayState extends MusicBeatState
 
 	public function goodNoteHit(note:Note):Void
 	{
+		if (!replayMode && !cpuControlled && replayData != null)
+			replayData.push({t: note.strumTime, d: note.noteData});
 		if(note.wasGoodHit) return;
 		if(cpuControlled && note.ignoreNote) return;
 
@@ -3055,9 +3130,9 @@ class PlayState extends MusicBeatState
 		if(!cpuControlled)
 		{
 			var spr = playerStrums.members[note.noteData];
-			if(spr != null) spr.playAnim('confirm', true);
+			if(!replayMode && spr != null) spr.playAnim('confirm', true);
 		}
-		else strumPlayAnim(false, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / playbackRate);
+		else if(!replayMode) strumPlayAnim(false, Std.int(Math.abs(note.noteData)), Conductor.stepCrochet * 1.25 / 1000 / playbackRate);
 		vocals.volume = 1;
 
 		if (!note.isSustainNote)
