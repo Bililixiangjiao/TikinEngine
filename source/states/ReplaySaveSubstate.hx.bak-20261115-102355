@@ -1,0 +1,145 @@
+package states;
+
+import flixel.FlxSprite;
+import flixel.FlxSubState;
+import flixel.text.FlxText;
+import flixel.util.FlxColor;
+import flixel.util.FlxTimer;
+import flixel.FlxG;
+import backend.Paths;
+import backend.CoolUtil;
+import backend.Highscore;
+import ReplayUtil;
+
+class ReplaySaveSubstate extends FlxSubState
+{
+public static var decided:Bool = false;
+
+var ps:PlayState;
+var acc:Float;
+var misses:Int;
+var bestCombo:Int;
+var scr:Int;
+var songName:String;
+var diff:Int;
+var done:Bool = false;
+
+public function new(ps:PlayState, acc:Float, misses:Int, bestCombo:Int, scr:Int, songName:String, diff:Int)
+{
+super();
+this.ps = ps;
+this.acc = acc;
+this.misses = misses;
+this.bestCombo = bestCombo;
+this.scr = scr;
+this.songName = songName;
+this.diff = diff;
+}
+
+override function create()
+{
+super.create();
+
+var bg = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+bg.alpha = 0.86;
+add(bg);
+
+var fnt = Paths.font('pixel.otf');
+
+var title = new FlxText(0, 50, FlxG.width, 'SONG CLEARED');
+title.setFormat(fnt, 44, FlxColor.WHITE, 'center');
+add(title);
+
+var line = new FlxSprite(140, 128).makeGraphic(FlxG.width - 280, 2, FlxColor.WHITE);
+add(line);
+
+var lx:Float = 140;
+var ly:Float = 160;
+var gap:Float = 38;
+
+var t11 = new FlxText(lx, ly, 480, 'ACCURACY   ' + CoolUtil.floorDecimal(acc * 100, 2) + '%');
+t11.setFormat(fnt, 24, FlxColor.WHITE, 'left');
+add(t11);
+
+var t12 = new FlxText(lx, ly + gap, 480, 'MISSES     ' + misses);
+t12.setFormat(fnt, 24, FlxColor.WHITE, 'left');
+add(t12);
+
+var t13 = new FlxText(lx, ly + gap * 2, 480, 'MAX COMBO  ' + bestCombo);
+t13.setFormat(fnt, 24, FlxColor.WHITE, 'left');
+add(t13);
+
+var t14 = new FlxText(lx, ly + gap * 3, 480, 'SCORE      ' + scr);
+t14.setFormat(fnt, 24, FlxColor.WHITE, 'left');
+add(t14);
+
+var bestScore:Int = 0;
+var bestAcc:Float = 0;
+try { bestScore = Highscore.getScore(songName, diff); } catch (e:Dynamic) {}
+try { bestAcc = Highscore.getRating(songName, diff); } catch (e:Dynamic) {}
+
+var dScore:Int = scr - bestScore;
+var dAcc:Float = (acc - bestAcc) * 100;
+
+var rx:Float = FlxG.width - 560;
+
+var t21 = new FlxText(rx, ly, 420, 'BEST SCORE   ' + bestScore);
+t21.setFormat(fnt, 24, 0xFF9AD0FF, 'right');
+add(t21);
+
+var t22 = new FlxText(rx, ly + gap, 420, 'BEST ACC     ' + CoolUtil.floorDecimal(bestAcc * 100, 2) + '%');
+t22.setFormat(fnt, 24, 0xFF9AD0FF, 'right');
+add(t22);
+
+var t23 = new FlxText(rx, ly + gap * 2, 420, 'DELTA SCORE  ' + (dScore >= 0 ? '+' : '') + dScore);
+t23.setFormat(fnt, 24, dScore >= 0 ? 0xFF90FF90 : 0xFFFF9090, 'right');
+add(t23);
+
+var t24 = new FlxText(rx, ly + gap * 3, 420, 'DELTA ACC    ' + (dAcc >= 0 ? '+' : '') + CoolUtil.floorDecimal(dAcc, 2) + '%');
+t24.setFormat(fnt, 24, dAcc >= 0 ? 0xFF90FF90 : 0xFFFF9090, 'right');
+add(t24);
+
+var by:Float = FlxG.height - 140;
+
+var b1 = new FlxSprite(140, by).makeGraphic(300, 80, FlxColor.WHITE);
+b1.alpha = 0.12;
+add(b1);
+var t1 = new FlxText(140, by + 24, 300, '[F6]  SAVE');
+t1.setFormat(fnt, 26, FlxColor.WHITE, 'center');
+add(t1);
+
+var b2 = new FlxSprite(FlxG.width - 440, by).makeGraphic(300, 80, FlxColor.WHITE);
+b2.alpha = 0.12;
+add(b2);
+var t2 = new FlxText(FlxG.width - 440, by + 24, 300, '[F7]  NO SAVE');
+t2.setFormat(fnt, 26, FlxColor.WHITE, 'center');
+add(t2);
+}
+
+override function update(elapsed:Float)
+{
+super.update(elapsed);
+if (done) return;
+
+if (FlxG.keys.justPressed.F6) { done = true; doSave(); }
+else if (FlxG.keys.justPressed.F7) { done = true; doNoSave(); }
+}
+
+function doSave()
+{
+if (PlayState.replayData != null && PlayState.replayData.length > 0)
+ReplayUtil.save(songName, diff, PlayState.replayData);
+PlayState.replayData = null;
+decided = true;
+close();
+new FlxTimer().start(0.1, function(_) { ps.endSong(); });
+}
+
+function doNoSave()
+{
+PlayState.replayData = null;
+decided = true;
+close();
+new FlxTimer().start(0.1, function(_) { ps.endSong(); });
+}
+}

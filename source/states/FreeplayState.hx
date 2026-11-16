@@ -1,15 +1,23 @@
 package states;
 
+import ReplayUtil;
 import backend.WeekData;
+import ReplayUtil;
 import backend.Highscore;
+import ReplayUtil;
 import backend.Song;
 
+import ReplayUtil;
 import objects.HealthIcon;
+import ReplayUtil;
 import objects.MusicPlayer;
 
+import ReplayUtil;
 import substates.GameplayChangersSubstate;
+import ReplayUtil;
 import substates.ResetScoreSubState;
 
+import ReplayUtil;
 import flixel.math.FlxMath;
 
 class FreeplayState extends MusicBeatState
@@ -50,6 +58,7 @@ class FreeplayState extends MusicBeatState
 
 	override function create()
 	{
+		PlayState.replayMode = false;
 		//Paths.clearStoredMemory();
 		//Paths.clearUnusedMemory();
 		
@@ -197,6 +206,17 @@ class FreeplayState extends MusicBeatState
 	var holdTime:Float = 0;
 	override function update(elapsed:Float)
 	{
+		if (FlxG.keys.pressed.SHIFT && FlxG.keys.justPressed.ENTER && !player.playingMusic)
+		{
+			var wSong:String = songs[curSelected].songName.toLowerCase();
+			if (ReplayUtil.exists(wSong, curDifficulty))
+			{
+				persistentUpdate = false;
+				openSubState(new ReplaySelectSubstate(wSong, curDifficulty));
+				return;
+			}
+		}
+
 		if (FlxG.sound.music.volume < 0.7)
 		{
 			FlxG.sound.music.volume += 0.5 * FlxG.elapsed;

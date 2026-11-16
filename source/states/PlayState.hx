@@ -1152,7 +1152,7 @@ class PlayState extends MusicBeatState
 
 		var tempScore:String = 'Score: ${songScore}'
 		+ (!instakillOnMiss ? '| Misses: ${songMisses}' : "")
-		+ ' | Rating: ${str} |     |TikinEngine-v1.2.0 |song ${SONG.song}';
+		+ ' | Rating: ${str} |     |TikinEngine-v1.3.0 |song ${SONG.song}';
 		// "tempScore" variable is used to prevent another memory leak, just in case
 		// "\n" here prevents the text from being cut off by beat zooms
 		scoreTxt.text = '${tempScore}\n';
@@ -1173,8 +1173,8 @@ class PlayState extends MusicBeatState
 		ratingFC = "";
 		if(songMisses == 0)
 		{
-			if (bads > 2 || shits > 2) ratingFC = 'A';
-			else if (goods > 5) ratingFC = 'S';
+			if (bads > 10 || shits > 10) ratingFC = 'A';
+			else if (goods > 10) ratingFC = 'S';
 			else if (sicks > 0) ratingFC = 'SS';
 		}
 		else {

@@ -1,0 +1,72 @@
+package states;
+import flixel.FlxSubState;
+import flixel.FlxG;
+import flixel.FlxSprite;
+import flixel.ui.FlxButton;
+import flixel.text.FlxText;
+import flixel.util.FlxColor;
+import haxe.Json;
+import sys.io.File;
+import sys.FileSystem;
+class ReplaySaveSubstate extends FlxSubState
+{
+var frames:Array<Dynamic>;
+var songName:String;
+var onDone:Void->Void;
+public function new(f:Array<Dynamic>, s:String, cb:Void->Void)
+{
+super(0xE6000000);
+frames = f;
+songName = (s != null) ? s.split(' ').join('_') : 'unknown';
+onDone = cb;
+}
+override function create():Void
+{
+super.create();
+var t = new FlxText(0, 50, FlxG.width, "REPLAY", 48);
+t.setFormat(null, 48, FlxColor.WHITE, "center");
+add(t);
+var px:Float = FlxG.width/2 - 200;
+var py:Float = 130;
+var pw:Float = 400;
+var ph:Float = 260;
+add(new FlxSprite(px, py).makeGraphic(Std.int(pw), Std.int(ph), 0xFF101018));
+var mt:Float = 1;
+if (frames != null) for (f in frames) if (f.t > mt) mt = f.t;
+if (frames != null) for (f in frames)
+{
+var k:Int = Std.int(Math.abs(f.k)) % 4;
+var x:Float = px + (k + 0.5) * (pw / 4) - 2;
+var y:Float = py + ph - (f.t / mt) * ph - 2;
+add(new FlxSprite(x, y).makeGraphic(4, 4, FlxColor.CYAN));
+}
+var b1 = new FlxButton(FlxG.width/2 - 230, py + ph + 50, "保存", function() { doSave(); close(); });
+b1.scale.set(2, 2); b1.updateHitbox(); add(b1);
+var b2 = new FlxButton(FlxG.width/2 + 70, py + ph + 50, "不保存", function() { close(); });
+b2.scale.set(2, 2); b2.updateHitbox(); add(b2);
+var h = new FlxText(0, py + ph + 130, FlxG.width, "F6 保存    F7 不保存", 20);
+h.setFormat(null, 20, FlxColor.GRAY, "center");
+add(h);
+}
+override function update(elapsed:Float):Void
+{
+super.update(elapsed);
+if (FlxG.keys.justPressed.F6) { doSave(); close(); }
+else if (FlxG.keys.justPressed.F7) close();
+}
+override public function close():Void
+{
+super.close();
+if (onDone != null) onDone();
+}
+function doSave():Void
+{
+try {
+var d:String = 'data/replay/';
+if (!FileSystem.exists(d)) FileSystem.createDirectory(d);
+var p:String = d + songName + '_' + Date.now().getTime() + '.json';
+File.saveContent(p, Json.stringify({ song: songName, frames: frames }, null, '  '));
+trace('[REPLAY] saved ' + p);
+} catch (e:Dynamic) trace('[REPLAY] fail: ' + e);
+}
+}

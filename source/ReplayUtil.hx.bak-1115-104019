@@ -1,0 +1,48 @@
+import haxe.Json;
+import sys.FileSystem;
+import sys.io.File;
+
+class ReplayUtil
+{
+static function baseDir():String
+{
+#if windows
+var a:String = Sys.getEnv('APPDATA');
+if (a != null && a.length > 0)
+return a + '\\TikinEngine\\replays\\';
+#end
+return 'assets/replays/';
+}
+
+public static function path(song:String, diff:Int):String
+return baseDir() + song + '-' + diff + '.json';
+
+public static function exists(song:String, diff:Int):Bool
+return FileSystem.exists(path(song, diff));
+
+public static function save(song:String, diff:Int, data:Array<Dynamic>):Void
+{
+var dir:String = baseDir();
+if (!FileSystem.exists(dir))
+{
+#if windows
+var a:String = Sys.getEnv('APPDATA');
+if (a != null && a.length > 0)
+{
+var mid:String = a + '\\TikinEngine';
+if (!FileSystem.exists(mid)) FileSystem.createDirectory(mid);
+}
+#end
+FileSystem.createDirectory(dir);
+}
+File.saveContent(path(song, diff), Json.stringify(data));
+}
+
+public static function load(song:String, diff:Int):Array<Dynamic>
+{
+var p:String = path(song, diff);
+if (!FileSystem.exists(p)) return null;
+try { return cast Json.parse(File.getContent(p)); }
+catch (e:Dynamic) { return null; }
+}
+}

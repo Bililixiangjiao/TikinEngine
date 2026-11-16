@@ -1,0 +1,115 @@
+package states;
+
+import flixel.FlxSprite;
+import flixel.FlxSubState;
+import flixel.text.FlxText;
+import flixel.util.FlxColor;
+import flixel.FlxG;
+import backend.Paths;
+import backend.Highscore;
+import backend.Song;
+import ReplayUtil;
+
+class ReplaySelectSubstate extends FlxSubState
+{
+var songName:String;
+var diff:Int;
+var files:Array<String> = [];
+var texts:Array<FlxText> = [];
+var cur:Int = 0;
+var rowH:Float = 52;
+var visibleRows:Int = 9;
+var listTop:Float = 0;
+
+public function new(song:String, d:Int)
+{
+super();
+songName = song;
+diff = d;
+}
+
+override function create()
+{
+super.create();
+
+files = ReplayUtil.list(songName, diff);
+
+var bg:FlxSprite = new FlxSprite(0, 0).makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
+bg.scrollFactor.set();
+add(bg);
+
+var fnt = Paths.font('pixel.otf');
+
+var title:FlxText = new FlxText(0, FlxG.height * 0.08, FlxG.width, 'SELECT WARP  (' + files.length + ')');
+title.setFormat(fnt, 44, FlxColor.WHITE, 'center');
+title.scrollFactor.set();
+add(title);
+
+var line:FlxSprite = new FlxSprite(FlxG.width * 0.1, FlxG.height * 0.20);
+line.makeGraphic(Std.int(FlxG.width * 0.8), 3, FlxColor.WHITE);
+line.scrollFactor.set();
+add(line);
+
+if (files.length == 0)
+{
+var t:FlxText = new FlxText(0, FlxG.height * 0.45, FlxG.width, 'NO WARP SAVED');
+t.setFormat(fnt, 36, 0xFF888888, 'center');
+t.scrollFactor.set();
+add(t);
+return;
+}
+
+listTop = FlxG.height * 0.28;
+for (i in 0...files.length)
+{
+var t:FlxText = new FlxText(0, listTop + rowH * i, FlxG.width, ReplayUtil.displayName(files[i]));
+t.setFormat(fnt, 30, 0xFF888888, 'center');
+t.scrollFactor.set();
+add(t);
+texts.push(t);
+}
+refresh();
+}
+
+function refresh()
+{
+if (texts.length == 0) return;
+for (i in 0...texts.length)
+{
+if (i == cur) { texts[i].color = 0xFFFFFFFF; texts[i].alpha = 1; }
+else { texts[i].color = 0xFF888888; texts[i].alpha = 0.75; }
+}
+var first:Int = 0;
+if (texts.length > visibleRows)
+first = Std.int(Math.max(0, Math.min(cur - Std.int(visibleRows / 2), texts.length - visibleRows)));
+for (i in 0...texts.length)
+texts[i].y = listTop + rowH * (i - first);
+}
+
+override function update(elapsed:Float)
+{
+super.update(elapsed);
+
+if (files.length == 0)
+{
+if (FlxG.keys.justPressed.ESCAPE || FlxG.keys.justPressed.ENTER) close();
+return;
+}
+
+if (FlxG.keys.justPressed.UP) { cur--; if (cur < 0) cur = files.length - 1; refresh(); }
+else if (FlxG.keys.justPressed.DOWN) { cur++; if (cur >= files.length) cur = 0; refresh(); }
+else if (FlxG.keys.justPressed.ENTER) startReplay(files[cur]);
+else if (FlxG.keys.justPressed.ESCAPE) close();
+}
+
+function startReplay(file:String)
+{
+PlayState.replayFileName = file;
+PlayState.replayMode = true;
+PlayState.storyDifficulty = diff;
+var poop:String = Highscore.formatSong(songName, diff);
+PlayState.SONG = Song.loadFromJson(poop, songName);
+PlayState.isStoryMode = false;
+LoadingState.loadAndSwitchState(new PlayState());
+}
+}

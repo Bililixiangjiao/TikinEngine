@@ -1,0 +1,98 @@
+import haxe.Json;
+import sys.FileSystem;
+import sys.io.File;
+import Date;
+
+class ReplayUtil
+{
+static function baseDir():String
+{
+#if windows
+var a:String = Sys.getEnv('APPDATA');
+if (a != null && a.length > 0) return a + '\\TikinEngine\\replays\\';
+#end
+return 'assets/replays/';
+}
+
+static function ensureDir():Void
+{
+var dir:String = baseDir();
+if (FileSystem.exists(dir)) return;
+#if windows
+var a:String = Sys.getEnv('APPDATA');
+if (a != null && a.length > 0)
+{
+var mid:String = a + '\\TikinEngine';
+if (!FileSystem.exists(mid)) FileSystem.createDirectory(mid);
+}
+#end
+FileSystem.createDirectory(dir);
+}
+
+static function pad(v:Int, n:Int):String
+{
+var s:String = Std.string(v);
+while (s.length < n) s = '0' + s;
+return s;
+}
+
+public static function stamp():String
+{
+var d:Date = Date.now();
+return pad(d.getFullYear(), 4) + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2)
++ '-' + pad(d.getHours(), 2) + pad(d.getMinutes(), 2) + pad(d.getSeconds(), 2);
+}
+
+public static function list(song:String, diff:Int):Array<String>
+{
+var out:Array<String> = [];
+var dir:String = baseDir();
+if (!FileSystem.exists(dir)) return out;
+var prefix:String = song + '-' + diff + '-';
+var legacy:String = song + '-' + diff + '.json';
+for (n in FileSystem.readDirectory(dir))
+{
+if (StringTools.startsWith(n, prefix) && StringTools.endsWith(n, '.json')) out.push(n);
+else if (n == legacy) out.push(n);
+}
+out.sort(function(a:String, b:String):Int return a > b ? -1 : (a < b ? 1 : 0));
+return out;
+}
+
+public static function exists(song:String, diff:Int):Bool
+return list(song, diff).length > 0;
+
+public static function displayName(file:String):String
+{
+var n:String = file;
+if (StringTools.endsWith(n, '.json')) n = n.substr(0, n.length - 5);
+if (n.length < 16) return '[OLD] ' + n;
+var ymd:String = n.substr(n.length - 15, 8);
+var hms:String = n.substr(n.length - 6, 6);
+return ymd.substr(0, 4) + '-' + ymd.substr(4, 2) + '-' + ymd.substr(6, 2)
++ ' ' + hms.substr(0, 2) + ':' + hms.substr(2, 2) + ':' + hms.substr(4, 2);
+}
+
+public static function save(song:String, diff:Int, data:Array<Dynamic>):String
+{
+ensureDir();
+var f:String = song + '-' + diff + '-' + stamp() + '.json';
+File.saveContent(baseDir() + f, Json.stringify(data));
+return f;
+}
+
+public static function load(song:String, diff:Int, file:String = null):Array<Dynamic>
+{
+var p:String;
+if (file != null && file.length > 0) p = baseDir() + file;
+else
+{
+var all:Array<String> = list(song, diff);
+if (all.length == 0) return null;
+p = baseDir() + all[0];
+}
+if (!FileSystem.exists(p)) return null;
+try { return cast Json.parse(File.getContent(p)); }
+catch (e:Dynamic) { return null; }
+}
+}
