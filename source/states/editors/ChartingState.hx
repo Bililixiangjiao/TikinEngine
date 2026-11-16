@@ -1882,6 +1882,9 @@ class ChartingState extends MusicBeatState
 			if(FlxG.keys.justPressed.Z && FlxG.keys.pressed.CONTROL) {
 				undo();
 			}
+			if(FlxG.keys.justPressed.Y && FlxG.keys.pressed.CONTROL) {
+			    redo();
+			}
 
 			if(FlxG.keys.justPressed.Z && curZoom > 0 && !FlxG.keys.pressed.CONTROL) {
 				--curZoom;
@@ -2937,6 +2940,7 @@ class ChartingState extends MusicBeatState
 
 	function deleteNote(note:Note):Void
 	{
+	pushUndo();
 		var noteDataToCheck:Int = note.noteData;
 		if(noteDataToCheck > -1 && note.mustPress != _song.notes[curSec].mustHitSection) noteDataToCheck += 4;
 
@@ -3020,6 +3024,7 @@ class ChartingState extends MusicBeatState
 
 		if(noteData > -1)
 		{
+			pushUndo();
 			_song.notes[curSec].sectionNotes.push([noteStrum, noteData, noteSus, curNoteTypes[daType]]);
 			curSelectedNote = _song.notes[curSec].sectionNotes[_song.notes[curSec].sectionNotes.length - 1];
 		}
@@ -3028,6 +3033,7 @@ class ChartingState extends MusicBeatState
 			var event = eventStuff[Std.parseInt(eventDropDown.selectedId)][0];
 			var text1 = value1InputText.text;
 			var text2 = value2InputText.text;
+			pushUndo();
 			_song.events.push([noteStrum, [[event, text1, text2]]]);
 			curSelectedNote = _song.events[_song.events.length - 1];
 			curEventSelected = 0;
@@ -3036,6 +3042,7 @@ class ChartingState extends MusicBeatState
 
 		if (FlxG.keys.pressed.CONTROL && noteData > -1)
 		{
+			pushUndo();
 			_song.notes[curSec].sectionNotes.push([noteStrum, (noteData + 4) % 8, noteSus, curNoteTypes[daType]]);
 		}
 
@@ -3046,20 +3053,41 @@ class ChartingState extends MusicBeatState
 		updateNoteUI();
 	}
 
-	// will figure this out l8r
-	function redo()
-	{
-		//_song = redos[curRedoIndex];
-	}
+// ===== 1.3.0 撤销/重做系统 =====
+var _undoStack:Array<String> = [];
+var _redoStack:Array<String> = [];
+static inline var MAX_UNDO_STEPS:Int = 60;
 
-	function undo()
-	{
-		//redos.push(_song);
-		undos.pop();
-		//_song.notes = undos[undos.length - 1];
-		///trace(_song.notes);
-		//updateGrid();
-	}
+function snapshotChart():String {
+    return haxe.Json.stringify({notes: _song.notes, events: _song.events});
+}
+
+function pushUndo():Void {
+    _undoStack.push(snapshotChart());
+    if (_undoStack.length > MAX_UNDO_STEPS) _undoStack.shift();
+    _redoStack = [];
+}
+
+function restoreChart(json:String):Void {
+    var data:Dynamic = haxe.Json.parse(json);
+    _song.notes = cast data.notes;
+    _song.events = cast data.events;
+    curSelectedNote = null;
+    updateGrid();
+    updateNoteUI();
+}
+
+function undo():Void {
+    if (_undoStack.length == 0) return;
+    _redoStack.push(snapshotChart());
+    restoreChart(_undoStack.pop());
+}
+
+function redo():Void {
+    if (_redoStack.length == 0) return;
+    _undoStack.push(snapshotChart());
+    restoreChart(_redoStack.pop());
+}
 
 	function getStrumTime(yPos:Float, doZoomCalc:Bool = true):Float
 	{
