@@ -39,3 +39,6 @@ secrets.json
 *.jpeg
 *.psd
 *.fla
+mods/
+*.bak*
+*.broken*
